@@ -273,10 +273,13 @@ Application::Application(int &argc, char **argv)
         }
     }
 
-    // try to migrate legacy accounts and folders from a previous client version
-    // only copy the settings and check what should be skipped
-    if (ConfigFile().exists() && !configVersionMigration()) {
-        qCWarning(lcApplication) << "Config version migration was not possible.";
+    if (_theme->doNotUseProxy()) {
+        ConfigFile().setProxyType(QNetworkProxy::NoProxy);
+        for (const auto &accountState : AccountManager::instance()->accounts()) {
+            if (accountState && accountState->account()) {
+                accountState->account()->setProxyType(QNetworkProxy::NoProxy);
+            }
+        }
     }
 
     parseOptions(arguments());
@@ -388,7 +391,7 @@ Application::Application(int &argc, char **argv)
         ConfigFile().setProxyType(QNetworkProxy::NoProxy);
         for (const auto &accountState : AccountManager::instance()->accounts()) {
             if (accountState && accountState->account()) {
-                accountState->account()->setNetworkProxySetting(Account::AccountNetworkProxySetting::GlobalProxy);
+                accountState->account()->setProxyType(QNetworkProxy::NoProxy);
             }
         }
     }
