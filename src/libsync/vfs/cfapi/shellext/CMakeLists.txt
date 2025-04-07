@@ -206,6 +206,10 @@ set_target_properties(CfApiShellExtensions
             ${BIN_OUTPUT_DIRECTORY}
         RUNTIME_OUTPUT_DIRECTORY
             ${BIN_OUTPUT_DIRECTORY}
+        VERSION
+            ${WINDOWS_INTEGRATION_VERSION}
+        SOVERSION
+            ${WINDOWS_INTEGRATION_SOVERSION}
 )
 
 install(TARGETS CfApiShellExtensions 
