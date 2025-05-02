@@ -127,6 +127,7 @@ Q_LOGGING_CATEGORY(lcConfigFile, "nextcloud.sync.configfile", QtInfoMsg)
 
 QString ConfigFile::_confDir = {};
 QString ConfigFile::_discoveredLegacyConfigPath = {};
+QString ConfigFile::_discoveredLegacyConfigFile = {};
 
 static chrono::milliseconds millisecondsValue(const QSettings &setting, const char *key,
     chrono::milliseconds defaultValue)
@@ -1327,6 +1328,20 @@ void ConfigFile::setDiscoveredLegacyConfigPath(const QString &discoveredLegacyCo
     _discoveredLegacyConfigPath = discoveredLegacyConfigPath;
 }
 
+QString ConfigFile::discoveredLegacyConfigFile()
+{
+    return _discoveredLegacyConfigFile;
+}
+
+void ConfigFile::setDiscoveredLegacyConfigFile(const QString &discoveredLegacyConfigFile)
+{
+    if (_discoveredLegacyConfigFile == discoveredLegacyConfigFile) {
+        return;
+    }
+
+    _discoveredLegacyConfigFile = discoveredLegacyConfigFile;
+}
+
 bool ConfigFile::setupConfigFolderFromLegacyLocation(const QString &legacyLocation) const
 {
     // Migrate from version <= 2.4
@@ -1380,14 +1395,13 @@ QT_WARNING_POP
     return false;
 }
 
-QString ConfigFile::findLegacyConfigFile() const
+QString ConfigFile::findLegacyClientConfigFile() const
 {
     qCInfo(lcConfigFile) << "Migrate: restoreFromLegacySettings, checking settings group"
                           << Theme::instance()->appName();
 
-           // try to open the correctly themed settings
+    // try to open the correctly themed settings
     auto settings = ConfigFile::settingsWithGroup(Theme::instance()->appName());
-
 
     QString validLegacyConfigFile;
     // if the settings file could not be opened, the childKeys list is empty
@@ -1431,7 +1445,8 @@ QString ConfigFile::findLegacyConfigFile() const
                 configFileInfo.exists() && configFileInfo.isReadable()) {
                 qCInfo(lcConfigFile) << "Migrate: checking old config " << configFile;
                 validLegacyConfigFile = configFile;
-                ConfigFile::setDiscoveredLegacyConfigPath(configFileInfo.canonicalPath());
+                setDiscoveredLegacyConfigFile(configFileInfo.filePath());
+                setDiscoveredLegacyConfigPath(configFileInfo.canonicalPath());
                 break;
             } else {
                 qCInfo(lcConfigFile()) << "Migrate: could not read old config " << configFile;

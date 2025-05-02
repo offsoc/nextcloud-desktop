@@ -264,22 +264,21 @@ Application::Application(int &argc, char **argv)
     parseOptions(arguments());
 
     ConfigFile configFile;
-    if (configFile.exists()) {
-        if (const auto genericConfigLocation = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/" + APPLICATION_CONFIG_NAME;
-            configFile.setupConfigFolderFromLegacyLocation(genericConfigLocation)) {
-            qCWarning(lcApplication) << "Setup of config folder and files from legacy location" << genericConfigLocation << "failed.";
-        }
+
+    // First check if there is an existing config from a previous version
+    if (configFile.exists() && configVersionMigration()) {
+        qCWarning(lcApplication) << "Config version migration was not possible.";
     } else {
+        // check legacy location for existing config files
+        // if (const auto genericConfigLocation = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/" + APPLICATION_CONFIG_NAME;
+        //     !configFile.setupConfigFolderFromLegacyLocation(genericConfigLocation)) {
+        //     qCWarning(lcApplication) << "Setup of config folder and files from legacy location" << genericConfigLocation << "failed.";
+        // } else
+
         if (const auto appDataLocation = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-            configFile.setupConfigFolderFromLegacyLocation(appDataLocation)) {
+            !configFile.setupConfigFolderFromLegacyLocation(appDataLocation)) {
             qCWarning(lcApplication) << "Setup of config folder and files from legacy location" << appDataLocation << "failed.";
         }
-    }
-
-    // try to migrate legacy accounts and folders from a previous client version
-    // only copy the settings and check what should be skipped
-    if (ConfigFile().exists() && !configVersionMigration()) {
-        qCWarning(lcApplication) << "Config version migration was not possible.";
     }
 
     //no need to waste time;
@@ -370,7 +369,7 @@ Application::Application(int &argc, char **argv)
 
     connect(this, &SharedTools::QtSingleApplication::messageReceived, this, &Application::slotParseMessage);
 
-    // create accounts and folders from a legacy desktop client or from the current config file
+    // create accounts and folders from a legacy desktop client or for a new config file
     _folderManager.reset(new FolderMan);
     FolderMan::instance()->setSyncEnabled(true);
     AccountManager::instance()->setupAccountsAndFolders();

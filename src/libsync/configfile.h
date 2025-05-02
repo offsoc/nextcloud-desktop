@@ -255,6 +255,8 @@ public:
     /// Set during first time migration of legacy accounts in AccountManager
     [[nodiscard]] static QString discoveredLegacyConfigPath();
     static void setDiscoveredLegacyConfigPath(const QString &discoveredLegacyConfigPath);
+    [[nodiscard]] static QString discoveredLegacyConfigFile();
+    static void setDiscoveredLegacyConfigFile(const QString &discoveredLegacyConfigFile);
 
     static constexpr char isVfsEnabledC[] = "isVfsEnabled";
     static constexpr char launchOnSystemStartupC[] = "launchOnSystemStartup";
@@ -271,7 +273,7 @@ public:
      *
      * Returns the found config file path found.
      */
-    [[nodiscard]] QString findLegacyConfigFile() const;
+    [[nodiscard]] QString findLegacyClientConfigFile() const;
 
 protected:
     [[nodiscard]] QVariant getPolicySetting(const QString &policy, const QVariant &defaultValue = QVariant()) const;
@@ -291,6 +293,7 @@ private:
 
     static QString _confDir;
     static QString _discoveredLegacyConfigPath;
+    static QString _discoveredLegacyConfigFile;
 };
 }
 #endif // CONFIGFILE_H
