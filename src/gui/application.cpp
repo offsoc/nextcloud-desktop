@@ -72,14 +72,6 @@
 
 class QSocket;
 
-namespace {
-constexpr auto accountsC = "Accounts";
-constexpr auto legacyRelativeConfigLocationC = "/ownCloud/owncloud.cfg";
-constexpr auto legacyCfgFileNameC = "owncloud.cfg";
-constexpr auto unbrandedRelativeConfigLocationC = "/Nextcloud/nextcloud.cfg";
-constexpr auto unbrandedCfgFileNameC = "nextcloud.cfg";
-}
-
 namespace OCC {
 
 Q_LOGGING_CATEGORY(lcApplication, "nextcloud.gui.application", QtInfoMsg)
@@ -269,14 +261,17 @@ Application::Application(int &argc, char **argv)
     setApplicationName(_theme->appName());
     setWindowIcon(_theme->applicationIcon());
 
-    if (!ConfigFile().exists()) {
+    parseOptions(arguments());
+
+    ConfigFile configFile;
+    if (configFile.exists()) {
         if (const auto genericConfigLocation = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/" + APPLICATION_CONFIG_NAME;
-            setupConfigFolderFromLegacyLocation(genericConfigLocation)) {
+            configFile.setupConfigFolderFromLegacyLocation(genericConfigLocation)) {
             qCWarning(lcApplication) << "Setup of config folder and files from legacy location" << genericConfigLocation << "failed.";
         }
     } else {
         if (const auto appDataLocation = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-            setupConfigFolderFromLegacyLocation(appDataLocation)) {
+            configFile.setupConfigFolderFromLegacyLocation(appDataLocation)) {
             qCWarning(lcApplication) << "Setup of config folder and files from legacy location" << appDataLocation << "failed.";
         }
     }
@@ -287,7 +282,6 @@ Application::Application(int &argc, char **argv)
         qCWarning(lcApplication) << "Config version migration was not possible.";
     }
 
-    parseOptions(arguments());
     //no need to waste time;
     if (_helpOnly || _versionOnly) {
         return;
@@ -377,7 +371,9 @@ Application::Application(int &argc, char **argv)
     connect(this, &SharedTools::QtSingleApplication::messageReceived, this, &Application::slotParseMessage);
 
     // create accounts and folders from a legacy desktop client or from the current config file
-    setupAccountsAndFolders();
+    _folderManager.reset(new FolderMan);
+    FolderMan::instance()->setSyncEnabled(true);
+    AccountManager::instance()->setupAccountsAndFolders();
 
     setQuitOnLastWindowClosed(false);
 
@@ -471,227 +467,9 @@ Application::~Application()
     AccountManager::instance()->shutdown();
 }
 
-void Application::setupAccountsAndFolders()
-{
-    _folderManager.reset(new FolderMan);
-    FolderMan::instance()->setSyncEnabled(true);
 
-    const auto accountsRestoreResult = restoreLegacyAccount();
 
-    const auto foldersListSize = FolderMan::instance()->setupFolders();
 
-    const auto prettyNamesList = [](const QList<AccountStatePtr> &accounts) {
-        QStringList list;
-        for (const auto &account : accounts) {
-            list << account->account()->prettyName().prepend("- ");
-        }
-        return list.join("\n");
-    };
-
-    if (const auto accounts = AccountManager::instance()->accounts();
-        accountsRestoreResult == AccountManager::AccountsRestoreSuccessFromLegacyVersion
-        && !accounts.isEmpty()) {
-
-        const auto accountsListSize = accounts.size();
-        if (Theme::instance()->displayLegacyImportDialog()) {
-            const auto accountsRestoreMessage = accountsListSize > 1
-                ? tr("%1 accounts", "number of accounts imported").arg(QString::number(accountsListSize))
-                : tr("1 account");
-            const auto foldersRestoreMessage = foldersListSize > 1
-                ? tr("%1 folders", "number of folders imported").arg(QString::number(foldersListSize))
-                : tr("1 folder");
-            const auto messageBox = new QMessageBox(QMessageBox::Information,
-                                                    tr("Legacy import"),
-                                                    tr("Imported %1 and %2 from a legacy desktop client.\n%3",
-                                                       "number of accounts and folders imported. list of users.")
-                                                        .arg(accountsRestoreMessage,
-                                                             foldersRestoreMessage,
-                                                             prettyNamesList(accounts))
-                                                    );
-            messageBox->setWindowModality(Qt::NonModal);
-            messageBox->open();
-        }
-
-        qCWarning(lcApplication) << "Migration result AccountManager::AccountsRestoreResult:" << accountsRestoreResult;
-        qCWarning(lcApplication) << "Folders migrated: " << foldersListSize;
-        qCWarning(lcApplication) << accountsListSize << "account(s) were migrated:" << prettyNamesList(accounts);
-
-    } else {
-        qCWarning(lcApplication) << "Migration result AccountManager::AccountsRestoreResult: " << accountsRestoreResult;
-        qCWarning(lcApplication) << "Folders migrated: " << foldersListSize;
-        qCWarning(lcApplication) << "No accounts were migrated, prompting user to set up accounts and folders from scratch.";
-    }
-}
-
-QString Application::findLegacyConfigFile() const
-{
-    qCInfo(lcApplication) << "Migrate: restoreFromLegacySettings, checking settings group"
-                             << Theme::instance()->appName();
-
-    // try to open the correctly themed settings
-    auto settings = ConfigFile::settingsWithGroup(Theme::instance()->appName());
-
-    auto wasLegacyImportDialogDisplayed = false;
-    const auto displayLegacyImportDialog = Theme::instance()->displayLegacyImportDialog();
-
-    QString validLegacyConfigFile;
-    // if the settings file could not be opened, the childKeys list is empty
-    // then try to load settings from a very old place
-    if (settings->childKeys().isEmpty()) {
-        // Legacy settings used QDesktopServices to get the location for the config folder in 2.4 and before
-        const auto legacy2_4CfgSettingsLocation = QString(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/data"));
-        const auto legacy2_4CfgFileParentFolder = legacy2_4CfgSettingsLocation.left(legacy2_4CfgSettingsLocation.lastIndexOf('/'));
-
-        // 2.5+ (rest of 2.x series)
-        const auto legacy2_5CfgSettingsLocation = QStandardPaths::writableLocation(Utility::isWindows() ? QStandardPaths::AppDataLocation : QStandardPaths::AppConfigLocation);
-        const auto legacy2_5CfgFileParentFolder = legacy2_5CfgSettingsLocation.left(legacy2_5CfgSettingsLocation.lastIndexOf('/'));
-
-        // Now try the locations we use today
-        const auto fullLegacyCfgFile = QDir::fromNativeSeparators(settings->fileName());
-        const auto legacyCfgFileParentFolder = fullLegacyCfgFile.left(fullLegacyCfgFile.lastIndexOf('/'));
-        const auto legacyCfgFileGrandParentFolder = legacyCfgFileParentFolder.left(legacyCfgFileParentFolder.lastIndexOf('/'));
-
-        const auto legacyCfgFileNamePath = QString(QStringLiteral("/") + legacyCfgFileNameC);
-        const auto legacyCfgFileRelativePath = QString(legacyRelativeConfigLocationC);
-
-        auto legacyLocations = QVector<QString>{legacy2_4CfgFileParentFolder + legacyCfgFileRelativePath,
-                                                legacy2_5CfgFileParentFolder + legacyCfgFileRelativePath,
-                                                legacyCfgFileParentFolder + legacyCfgFileNamePath,
-                                                legacyCfgFileGrandParentFolder + legacyCfgFileRelativePath};
-
-        if (Theme::instance()->isBranded()) {
-            const auto unbrandedCfgFileNamePath = QString(QStringLiteral("/") + unbrandedCfgFileNameC);
-            const auto unbrandedCfgFileRelativePath = QString(unbrandedRelativeConfigLocationC);
-            legacyLocations.append({legacyCfgFileParentFolder + unbrandedCfgFileNamePath, legacyCfgFileGrandParentFolder + unbrandedCfgFileRelativePath});
-        }
-
-        for (const auto &configFile : legacyLocations) {
-            auto oCSettings = std::make_unique<QSettings>(configFile, QSettings::IniFormat);
-            if (oCSettings->status() != QSettings::Status::NoError) {
-                qCInfo(lcApplication) << "Error reading legacy configuration file" << oCSettings->status();
-                break;
-            }
-
-            oCSettings->beginGroup(QLatin1String(accountsC));
-            const auto accountsListSize = oCSettings->childGroups().size();
-            oCSettings->endGroup();
-            if (const QFileInfo configFileInfo(configFile);
-                configFileInfo.exists() && configFileInfo.isReadable()) {
-                qCInfo(lcApplication) << "Migrate: checking old config " << configFile;
-                if (!AccountManager::instance()->forceLegacyImport() && accountsListSize > 0 && displayLegacyImportDialog) {
-                    wasLegacyImportDialogDisplayed = true;
-                    const auto importQuestion = accountsListSize > 1
-                        ? tr("%1 accounts were detected from a legacy desktop client.\n"
-                             "Should the accounts be imported?").arg(QString::number(accountsListSize))
-                        : tr("1 account was detected from a legacy desktop client.\n"
-                             "Should the account be imported?");
-                    const auto importMessageBox = new QMessageBox(QMessageBox::Question, tr("Legacy import"), importQuestion);
-                    importMessageBox->addButton(tr("Import"), QMessageBox::AcceptRole);
-                    const auto skipButton = importMessageBox->addButton(tr("Skip"), QMessageBox::DestructiveRole);
-                    importMessageBox->exec();
-                    if (importMessageBox->clickedButton() == skipButton) {
-                        return validLegacyConfigFile;
-                    }
-                }
-
-                validLegacyConfigFile = configFile;
-                ConfigFile::setDiscoveredLegacyConfigPath(configFileInfo.canonicalPath());
-                break;
-            } else {
-                qCInfo(lcApplication) << "Migrate: could not read old config " << configFile;
-            }
-        }
-    }
-
-    if (wasLegacyImportDialogDisplayed) {
-        QMessageBox::information(nullptr,
-                                 tr("Legacy import"),
-                                 tr("Could not import accounts from legacy client configuration."));
-    }
-
-    return validLegacyConfigFile;
-}
-
-bool Application::setupConfigFolderFromLegacyLocation(const QString &legacyLocation) const
-{
-    // Migrate from version <= 2.4
-    setApplicationName(_theme->appNameGUI());
-#ifndef QT_WARNING_DISABLE_DEPRECATED // Was added in Qt 5.9
-    #define QT_WARNING_DISABLE_DEPRECATED QT_WARNING_DISABLE_GCC("-Wdeprecated-declarations")
-#endif
-    QT_WARNING_PUSH
-    QT_WARNING_DISABLE_DEPRECATED
-    QT_WARNING_POP
-    setApplicationName(_theme->appName());
-
-    auto legacyDir = legacyLocation;
-    if (legacyDir.endsWith('/')) {
-        legacyDir.chop(1); // macOS 10.11.x does not like trailing slash for rename/move.
-    }
-
-    if (!QFileInfo(legacyDir).isDir()) {
-        return false;
-    }
-
-    auto confDir = ConfigFile().configPath();
-    if (confDir.endsWith('/')) {
-        confDir.chop(1);
-    }
-
-    qCInfo(lcApplication) << "Migrating old config from" << legacyDir << "to" << confDir;
-    if (!QFile::rename(legacyDir, confDir)) {
-        qCWarning(lcApplication) << "Failed to move the old config directory" << legacyDir << "to new location" << confDir;
-        if (QFileInfo(confDir).isDir() || QDir().mkdir(confDir)) {
-            const QStringList filesList = QDir(legacyDir).entryList(QDir::Files);
-            qCInfo(lcApplication) << "Will move the individual files:" << filesList;
-            auto setupCompleted = false;
-            for (const auto &name : filesList) {
-                if (!QFile::rename(legacyDir + "/" + name,  confDir + "/" + name)) {
-                    qCDebug(lcApplication) << "Fallback move of " << name << "also failed";
-                    continue;
-                }
-                setupCompleted = true;
-                qCInfo(lcApplication)  << "Move of " << name << "succeeded.";
-            }
-            return setupCompleted;
-        }
-    } else {
-#ifndef Q_OS_WIN
-        // Create a symbolic link so a downgrade of the client would still find the config.
-        return QFile::link(confDir, legacyDir);
-#endif
-    }
-
-    return false;
-}
-
-AccountManager::AccountsRestoreResult Application::restoreLegacyAccount()
-{
-    ConfigFile cfg;
-    const auto tryMigrate = cfg.overrideServerUrl().isEmpty();
-    auto accountsRestoreResult = AccountManager::AccountsRestoreFailure;
-    if (accountsRestoreResult = AccountManager::instance()->restore(findLegacyConfigFile(), tryMigrate);
-        accountsRestoreResult == AccountManager::AccountsRestoreFailure) {
-        // If there is an error reading the account settings, try again
-        // after a couple of seconds, if that fails, give up.
-        // (non-existence is not an error)
-        Utility::sleep(5);
-        if (accountsRestoreResult = AccountManager::instance()->restore(findLegacyConfigFile(), tryMigrate);
-            accountsRestoreResult == AccountManager::AccountsRestoreFailure) {
-            qCCritical(lcApplication) << "Could not read the account settings, quitting";
-            QMessageBox::critical(
-                nullptr,
-                tr("Error accessing the configuration file"),
-                tr("There was an error while accessing the configuration "
-                   "file at %1. Please make sure the file can be accessed by your system account.")
-                    .arg(ConfigFile().configFile()),
-                QMessageBox::Ok
-            );
-            QTimer::singleShot(0, qApp, &QCoreApplication::quit);
-        }
-    }
-    return accountsRestoreResult;
-}
 
 void Application::slotAccountStateRemoved(AccountState *accountState)
 {

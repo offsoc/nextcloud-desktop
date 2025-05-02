@@ -92,6 +92,8 @@ public:
      */
     static void backwardMigrationSettingsKeys(QStringList *deleteKeys, QStringList *ignoreKeys);
 
+    AccountManager::AccountsRestoreResult restoreLegacyAccount();
+    void setupAccountsAndFolders();
 public slots:
     /// Saves account data when adding user, when updating e.g. dav user, not including the credentials
     void saveAccount(const OCC::AccountPtr &newAccountData);

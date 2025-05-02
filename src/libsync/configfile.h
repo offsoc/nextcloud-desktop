@@ -264,6 +264,15 @@ public:
     static constexpr char showChatNotificationsC[] = "showChatNotifications";
     static constexpr char showInExplorerNavigationPaneC[] = "showInExplorerNavigationPane";
 
+    bool setupConfigFolderFromLegacyLocation(const QString &legacyLocation) const;
+    /**
+     * Looks for config files with different names from older client versions
+     * in different locations
+     *
+     * Returns the found config file path found.
+     */
+    [[nodiscard]] QString findLegacyConfigFile() const;
+
 protected:
     [[nodiscard]] QVariant getPolicySetting(const QString &policy, const QVariant &defaultValue = QVariant()) const;
     void storeData(const QString &group, const QString &key, const QVariant &value);
