@@ -115,8 +115,8 @@ static constexpr int deleteFilesThresholdDefaultValue = 100;
 constexpr auto accountsC = "Accounts";
 constexpr auto legacyRelativeConfigLocationC = "/ownCloud/owncloud.cfg";
 constexpr auto legacyCfgFileNameC = "owncloud.cfg";
-constexpr auto unbrandedRelativeConfigLocationC = "/copyNextcloud/copyNextcloud.cfg";
-constexpr auto unbrandedCfgFileNameC = "copyNextcloud.cfg";
+constexpr auto unbrandedRelativeConfigLocationC = "/Nextcloud/nextcloud.cfg";
+constexpr auto unbrandedCfgFileNameC = "nextcloud.cfg";
 }
 
 namespace OCC {
@@ -1342,7 +1342,7 @@ void ConfigFile::setDiscoveredLegacyConfigFile(const QString &discoveredLegacyCo
     _discoveredLegacyConfigFile = discoveredLegacyConfigFile;
 }
 
-bool ConfigFile::setupConfigFolderFromLegacyLocation(const QString &legacyLocation) const
+bool ConfigFile::copyConfigFolderFromLegacyLocation(const QString &legacyLocation) const
 {
     // Migrate from version <= 2.4
     qApp->setApplicationName(Theme::instance()->appNameGUI());
@@ -1395,7 +1395,7 @@ QT_WARNING_POP
     return false;
 }
 
-QString ConfigFile::findLegacyClientConfigFile() const
+void ConfigFile::findLegacyClientConfigFile()
 {
     qCInfo(lcConfigFile) << "Migrate: restoreFromLegacySettings, checking settings group"
                           << Theme::instance()->appName();
@@ -1403,7 +1403,6 @@ QString ConfigFile::findLegacyClientConfigFile() const
     // try to open the correctly themed settings
     auto settings = ConfigFile::settingsWithGroup(Theme::instance()->appName());
 
-    QString validLegacyConfigFile;
     // if the settings file could not be opened, the childKeys list is empty
     // then try to load settings from a very old place
     if (settings->childKeys().isEmpty()) {
@@ -1411,11 +1410,11 @@ QString ConfigFile::findLegacyClientConfigFile() const
         const auto legacy2_4CfgSettingsLocation = QString(QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/data"));
         const auto legacy2_4CfgFileParentFolder = legacy2_4CfgSettingsLocation.left(legacy2_4CfgSettingsLocation.lastIndexOf('/'));
 
-               // 2.5+ (rest of 2.x series)
+        // 2.5+ (rest of 2.x series)
         const auto legacy2_5CfgSettingsLocation = QStandardPaths::writableLocation(Utility::isWindows() ? QStandardPaths::AppDataLocation : QStandardPaths::AppConfigLocation);
         const auto legacy2_5CfgFileParentFolder = legacy2_5CfgSettingsLocation.left(legacy2_5CfgSettingsLocation.lastIndexOf('/'));
 
-               // Now try the locations we use today
+        // Now try the locations we use today
         const auto fullLegacyCfgFile = QDir::fromNativeSeparators(settings->fileName());
         const auto legacyCfgFileParentFolder = fullLegacyCfgFile.left(fullLegacyCfgFile.lastIndexOf('/'));
         const auto legacyCfgFileGrandParentFolder = legacyCfgFileParentFolder.left(legacyCfgFileParentFolder.lastIndexOf('/'));
@@ -1443,8 +1442,7 @@ QString ConfigFile::findLegacyClientConfigFile() const
 
             if (const QFileInfo configFileInfo(configFile);
                 configFileInfo.exists() && configFileInfo.isReadable()) {
-                qCInfo(lcConfigFile) << "Migrate: checking old config " << configFile;
-                validLegacyConfigFile = configFile;
+                qCInfo(lcConfigFile) << "Migrate: saving old config file" << configFile;
                 setDiscoveredLegacyConfigFile(configFileInfo.filePath());
                 setDiscoveredLegacyConfigPath(configFileInfo.canonicalPath());
                 break;
@@ -1453,7 +1451,5 @@ QString ConfigFile::findLegacyClientConfigFile() const
             }
         }
     }
-
-    return validLegacyConfigFile;
 }
 }

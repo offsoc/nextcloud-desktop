@@ -264,20 +264,21 @@ Application::Application(int &argc, char **argv)
     parseOptions(arguments());
 
     ConfigFile configFile;
-
     // First check if there is an existing config from a previous version
-    if (configFile.exists() && configVersionMigration()) {
+    if (const auto configExists = configFile.exists(); configExists && configVersionMigration()) {
         qCWarning(lcApplication) << "Config version migration was not possible.";
-    } else {
-        // check legacy location for existing config files
-        // if (const auto genericConfigLocation = QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/" + APPLICATION_CONFIG_NAME;
-        //     !configFile.setupConfigFolderFromLegacyLocation(genericConfigLocation)) {
-        //     qCWarning(lcApplication) << "Setup of config folder and files from legacy location" << genericConfigLocation << "failed.";
-        // } else
+    } else if (!configExists) {
+        // look for previous used application name for config folder.
+        if (const auto genericConfigLocation = QString(QStandardPaths::writableLocation(QStandardPaths::GenericConfigLocation) + "/" + APPLICATION_CONFIG_NAME);
+            configFile.copyConfigFolderFromLegacyLocation(genericConfigLocation)) {
+            qCWarning(lcApplication) << "Copy of config folder and files from legacy location" << genericConfigLocation << "suceeded.";
 
-        if (const auto appDataLocation = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-            !configFile.setupConfigFolderFromLegacyLocation(appDataLocation)) {
-            qCWarning(lcApplication) << "Setup of config folder and files from legacy location" << appDataLocation << "failed.";
+        // app data folder
+        } else if (const auto appDataLocation = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+            configFile.copyConfigFolderFromLegacyLocation(genericConfigLocation)) {
+            qCWarning(lcApplication) << "Copy of config folder and files from legacy location" << appDataLocation << "suceeded.";
+        } else {
+            configFile.findLegacyClientConfigFile();
         }
     }
 
