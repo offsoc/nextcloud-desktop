@@ -564,8 +564,6 @@ bool Application::setupConfigFolderFromLegacyLocation(const QString &legacyLocat
         return QFile::link(confDir, legacyDir);
 #endif
     }
-
-    return false;
 }
 
 AccountManager::AccountsRestoreResult Application::restoreLegacyAccount()
