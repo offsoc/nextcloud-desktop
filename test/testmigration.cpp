@@ -11,8 +11,6 @@
 
 #include "QtTest/qtestcase.h"
 #include "common/utility.h"
-#include "folderman.h"
-#include "account.h"
 #include "accountstate.h"
 #include <accountmanager.h>
 #include "configfile.h"
@@ -37,10 +35,9 @@ class TestMigration: public QObject
 {
     Q_OBJECT
 
-    std::unique_ptr<FolderMan> _fm;
+    ConfigFile configFile;
+    QTemporaryDir temporaryDir;
 
-signals:
-    void incomingShareDeleted();
 private:
     static constexpr char legacyAppName[] = "ownCloud";
     static constexpr char standardAppName[] = "Nextcloud";
@@ -82,21 +79,8 @@ private:
         "ownCloud_credentials%oc.de%2ba4b09a-1223-aaaa-abcd-c2df238816d8\\http\\password=true";
 
 private slots:
-
-
-
-    void createLegacyConfig()
-    {
-        QTemporaryDir temporaryDir;
-        QVERIFY(QDir(temporaryDir.path()).mkpath(standardAppName));
-        const auto standardConfigFolder = QString(temporaryDir.path() + "/" + standardAppName);
-        ConfigFile::setConfDir(standardConfigFolder);
-
-        ConfigFile standardConfigFile;
-        QSettings settings(standardConfigFile.configFile(), QSettings::IniFormat);
-        standardConfigFile.setClientVersionString("3.0.0");
+    void setupConfigFileAccount() {
         QScopedPointer<FakeQNAM> fakeQnam(new FakeQNAM({}));
-
         OCC::AccountPtr account = OCC::Account::create();
         account->setDavUser("user");
         account->setDavDisplayName("Nextcloud user");
@@ -110,58 +94,129 @@ private slots:
         account->setUrl(QUrl(("http://example.de")));
         const auto accountState = OCC::AccountManager::instance()->addAccount(account);
         OCC::AccountManager::instance()->saveAccount(accountState->account());
-
-        standardConfigFile.setOptionalServerNotifications(true);
-        standardConfigFile.setShowChatNotifications(true);
-        standardConfigFile.setShowCallNotifications(true);
-        standardConfigFile.setShowInExplorerNavigationPane(true);
-        standardConfigFile.setShowInExplorerNavigationPane(true);
-        standardConfigFile.setRemotePollInterval(std::chrono::milliseconds(1000));
-        standardConfigFile.setAutoUpdateCheck(true, QString());
-        standardConfigFile.setUpdateChannel("beta");
-        standardConfigFile.setOverrideServerUrl("http://example.de");
-        standardConfigFile.setOverrideLocalDir("A");
-        standardConfigFile.setVfsEnabled(true);
-        standardConfigFile.setProxyType(0);
-        standardConfigFile.setVfsEnabled(true);
-        standardConfigFile.setUseUploadLimit(0);
-        standardConfigFile.setUploadLimit(1);
-        standardConfigFile.setUseDownloadLimit(0);
-        standardConfigFile.setUseDownloadLimit(1);
-        standardConfigFile.setNewBigFolderSizeLimit(true, 500);
-        standardConfigFile.setNotifyExistingFoldersOverLimit(true);
-        standardConfigFile.setStopSyncingExistingFoldersOverLimit(true);
-        standardConfigFile.setConfirmExternalStorage(true);
-        standardConfigFile.setMoveToTrash(true);
-        standardConfigFile.setForceLoginV2(true);
-        standardConfigFile.setPromptDeleteFiles(true);
-        standardConfigFile.setDeleteFilesThreshold(1);
-        standardConfigFile.setMonoIcons(true);
-        standardConfigFile.setCrashReporter(true);
-        standardConfigFile.setAutomaticLogDir(true);
-        standardConfigFile.setLogDir(temporaryDir.path());
-        standardConfigFile.setLogDebug(true);
-        standardConfigFile.setLogExpire(72);
-        standardConfigFile.setLogFlush(true);
-        standardConfigFile.setCertificatePath(temporaryDir.path());
-        standardConfigFile.setCertificatePasswd("123456");
-        standardConfigFile.setLaunchOnSystemStartup(true);
-        standardConfigFile.setServerHasValidSubscription(true);
-        standardConfigFile.setDesktopEnterpriseChannel("stable");
-        standardConfigFile.setLanguage("pt");
-        settings.sync();
-
-        const auto standardConfig = QString(standardConfigFolder + "/" + QString(standardAppName).toLower() + ".cfg");;
-        QVERIFY(QFile::rename(standardConfigFile.configFile(), standardConfig));
-
-        QVERIFY(QDir(temporaryDir.path()).mkpath(legacyAppName));
-        const auto legacyConfigFolder = QString(temporaryDir.path() + "/" + legacyAppName);
-        const auto legacyConfigFilePath = QString(legacyConfigFolder + "/" + QString(legacyAppName).toLower() + ".cfg");
-        QFile legacyConfigFile(legacyConfigFilePath);
-        QVERIFY(legacyConfigFile.open(QFile::WriteOnly));
-        QCOMPARE_GE(legacyConfigFile.write(legacyAppConfigContent, qstrlen(legacyAppConfigContent)), 0);
-        legacyConfigFile.close();
     }
+
+    void setupConfigFileSettings() {
+        QSettings settings(configFile.configFile(), QSettings::IniFormat);
+        configFile.setClientVersionString("3.0.0");
+        configFile.setOptionalServerNotifications(true);
+        configFile.setShowChatNotifications(true);
+        configFile.setShowCallNotifications(true);
+        configFile.setShowInExplorerNavigationPane(true);
+        configFile.setShowInExplorerNavigationPane(true);
+        configFile.setRemotePollInterval(std::chrono::milliseconds(1000));
+        configFile.setAutoUpdateCheck(true, QString());
+        configFile.setUpdateChannel("beta");
+        configFile.setOverrideServerUrl("http://example.de");
+        configFile.setOverrideLocalDir("A");
+        configFile.setVfsEnabled(true);
+        configFile.setProxyType(0);
+        configFile.setVfsEnabled(true);
+        configFile.setUseUploadLimit(0);
+        configFile.setUploadLimit(1);
+        configFile.setUseDownloadLimit(0);
+        configFile.setUseDownloadLimit(1);
+        configFile.setNewBigFolderSizeLimit(true, 500);
+        configFile.setNotifyExistingFoldersOverLimit(true);
+        configFile.setStopSyncingExistingFoldersOverLimit(true);
+        configFile.setConfirmExternalStorage(true);
+        configFile.setMoveToTrash(true);
+        configFile.setForceLoginV2(true);
+        configFile.setPromptDeleteFiles(true);
+        configFile.setDeleteFilesThreshold(1);
+        configFile.setMonoIcons(true);
+        configFile.setCrashReporter(true);
+        configFile.setAutomaticLogDir(true);
+        configFile.setLogDir(temporaryDir.path());
+        configFile.setLogDebug(true);
+        configFile.setLogExpire(72);
+        configFile.setLogFlush(true);
+        configFile.setCertificatePath(temporaryDir.path());
+        configFile.setCertificatePasswd("123456");
+        configFile.setLaunchOnSystemStartup(true);
+        configFile.setServerHasValidSubscription(true);
+        configFile.setDesktopEnterpriseChannel("stable");
+        configFile.setLanguage("pt");
+        settings.sync();
+    }
+
+    // void createLegacyConfig()
+    // {
+    //     QTemporaryDir temporaryDir;
+    //     QVERIFY(QDir(temporaryDir.path()).mkpath(standardAppName));
+    //     const auto standardConfigFolder = QString(temporaryDir.path() + "/" + standardAppName);
+    //     ConfigFile::setConfDir(standardConfigFolder);
+
+    //     ConfigFile standardConfigFile;
+    //     QSettings settings(standardConfigFile.configFile(), QSettings::IniFormat);
+    //     standardConfigFile.setClientVersionString("3.0.0");
+    //     QScopedPointer<FakeQNAM> fakeQnam(new FakeQNAM({}));
+
+    //     OCC::AccountPtr account = OCC::Account::create();
+    //     account->setDavUser("user");
+    //     account->setDavDisplayName("Nextcloud user");
+    //     account->setProxyType(QNetworkProxy::ProxyType::HttpProxy);
+    //     account->setProxyUser("proxyuser");
+    //     account->setDownloadLimit(120);
+    //     account->setUploadLimit(120);
+    //     account->setDownloadLimitSetting(OCC::Account::AccountNetworkTransferLimitSetting::ManualLimit);
+    //     account->setServerVersion("30");
+    //     account->setCredentials(new FakeCredentials{fakeQnam.data()});
+    //     account->setUrl(QUrl(("http://example.de")));
+    //     const auto accountState = OCC::AccountManager::instance()->addAccount(account);
+    //     OCC::AccountManager::instance()->saveAccount(accountState->account());
+
+    //     standardConfigFile.setOptionalServerNotifications(true);
+    //     standardConfigFile.setShowChatNotifications(true);
+    //     standardConfigFile.setShowCallNotifications(true);
+    //     standardConfigFile.setShowInExplorerNavigationPane(true);
+    //     standardConfigFile.setShowInExplorerNavigationPane(true);
+    //     standardConfigFile.setRemotePollInterval(std::chrono::milliseconds(1000));
+    //     standardConfigFile.setAutoUpdateCheck(true, QString());
+    //     standardConfigFile.setUpdateChannel("beta");
+    //     standardConfigFile.setOverrideServerUrl("http://example.de");
+    //     standardConfigFile.setOverrideLocalDir("A");
+    //     standardConfigFile.setVfsEnabled(true);
+    //     standardConfigFile.setProxyType(0);
+    //     standardConfigFile.setVfsEnabled(true);
+    //     standardConfigFile.setUseUploadLimit(0);
+    //     standardConfigFile.setUploadLimit(1);
+    //     standardConfigFile.setUseDownloadLimit(0);
+    //     standardConfigFile.setUseDownloadLimit(1);
+    //     standardConfigFile.setNewBigFolderSizeLimit(true, 500);
+    //     standardConfigFile.setNotifyExistingFoldersOverLimit(true);
+    //     standardConfigFile.setStopSyncingExistingFoldersOverLimit(true);
+    //     standardConfigFile.setConfirmExternalStorage(true);
+    //     standardConfigFile.setMoveToTrash(true);
+    //     standardConfigFile.setForceLoginV2(true);
+    //     standardConfigFile.setPromptDeleteFiles(true);
+    //     standardConfigFile.setDeleteFilesThreshold(1);
+    //     standardConfigFile.setMonoIcons(true);
+    //     standardConfigFile.setCrashReporter(true);
+    //     standardConfigFile.setAutomaticLogDir(true);
+    //     standardConfigFile.setLogDir(temporaryDir.path());
+    //     standardConfigFile.setLogDebug(true);
+    //     standardConfigFile.setLogExpire(72);
+    //     standardConfigFile.setLogFlush(true);
+    //     standardConfigFile.setCertificatePath(temporaryDir.path());
+    //     standardConfigFile.setCertificatePasswd("123456");
+    //     standardConfigFile.setLaunchOnSystemStartup(true);
+    //     standardConfigFile.setServerHasValidSubscription(true);
+    //     standardConfigFile.setDesktopEnterpriseChannel("stable");
+    //     standardConfigFile.setLanguage("pt");
+    //     settings.sync();
+
+    //     const auto standardConfig = QString(standardConfigFolder + "/" + QString(standardAppName).toLower() + ".cfg");;
+    //     QVERIFY(QFile::rename(standardConfigFile.configFile(), standardConfig));
+
+    //     QVERIFY(QDir(temporaryDir.path()).mkpath(legacyAppName));
+    //     const auto legacyConfigFolder = QString(temporaryDir.path() + "/" + legacyAppName);
+    //     const auto legacyConfigFilePath = QString(legacyConfigFolder + "/" + QString(legacyAppName).toLower() + ".cfg");
+    //     QFile legacyConfigFile(legacyConfigFilePath);
+    //     QVERIFY(legacyConfigFile.open(QFile::WriteOnly));
+    //     QCOMPARE_GE(legacyConfigFile.write(legacyAppConfigContent, qstrlen(legacyAppConfigContent)), 0);
+    //     legacyConfigFile.close();
+    // }
 
     void initTestCase()
     {
@@ -169,8 +224,6 @@ private slots:
         OCC::Logger::instance()->setLogDebug(true);
 
         QStandardPaths::setTestModeEnabled(true);
-
-        createLegacyConfig();
     }
 
 
@@ -179,9 +232,29 @@ private slots:
     // Upgrade
     // Downgrade
     // Migration with --confdir
-
-    void testLeaveShare()
+    void testUpgradeWithConfDir()
     {
+        // create Nextcloud config with older version
+        QVERIFY(QDir(temporaryDir.path()).mkpath(standardAppName));
+        const auto standardConfigFolder = QString(temporaryDir.path() + "/" + standardAppName);
+        ConfigFile::setConfDir(standardConfigFolder);
+        setupConfigFileSettings();
+        setupConfigFileAccount();
+
+
+        // QTemporaryDir temporaryDir;
+        // int argc = 5;
+        // QByteArray appName = QString(QCoreApplication::applicationDirPath() + "/NextcloudDev").toLatin1();
+        // char *arg0 = appName.data();
+        // char arg1[] = "-platform";
+        // char arg2[] = "offscreen";
+        // char arg3[] = "--confdir";
+        // QByteArray temporaryDirPath = QString(temporaryDir.path()).toLatin1();
+        // char *arg4 = temporaryDirPath.data();
+        // char *argv[] = { arg0, arg1, arg2, arg3, arg4, nullptr };
+        // OCC::Application app(argc, argv);
+        // app.setApplicationName("Nextcloud");
+
         // QTemporaryDir dir;
         // ConfigFile::setConfDir(dir.path()); // we don't want to pollute the user's config file
 
@@ -276,7 +349,6 @@ private slots:
 
         // OCC::AccountManager::instance()->deleteAccount(accountState);
     }
-
 
 };
 
