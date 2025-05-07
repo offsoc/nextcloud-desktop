@@ -37,6 +37,8 @@ struct FileProviderConfig {
         set { internalConfig[ConfigKey.trashDeletionEnabled.rawValue] = newValue }
     }
 
+    lazy var trashDeletionSet = internalConfig[ConfigKey.trashDeletionEnabled.rawValue] != nil
+
     var fastEnumerationEnabled: Bool {
         get { internalConfig[ConfigKey.fastEnumerationEnabled.rawValue] as? Bool ?? true }
         set { internalConfig[ConfigKey.fastEnumerationEnabled.rawValue] = newValue }
