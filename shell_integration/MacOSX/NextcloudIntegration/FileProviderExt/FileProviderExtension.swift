@@ -260,6 +260,7 @@ import OSLog
                 domain: self.domain,
                 account: ncAccount,
                 remoteInterface: ncKit,
+                ignoredFiles: ignoredFiles,
                 progress: progress,
                 dbManager: dbManager
             )
@@ -349,6 +350,7 @@ import OSLog
                 contents: newContents,
                 options: options,
                 request: request,
+                ignoredFiles: ignoredFiles,
                 domain: domain,
                 progress: progress,
                 dbManager: dbManager
@@ -411,7 +413,9 @@ import OSLog
 
         let progress = Progress(totalUnitCount: 1)
         Task {
-            let error = await item.delete(dbManager: dbManager)
+            let error = await item.delete(
+                domain: domain, ignoredFiles: ignoredFiles, dbManager: dbManager
+            )
             if error != nil {
                 insertErrorAction(actionId)
                 signalEnumerator(completionHandler: { _ in })
